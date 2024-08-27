@@ -13,8 +13,9 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log("%c Oh, that's me :), I am the developer of this remake.", "font-size: 15px;");
     console.log("%c Pig55:", "font-size: 35px; font-weight: bold;");
     console.log("%c A very good friend of mine, and decided to help make the newer art assets for this remake, HUGE thanks to him.", "font-size: 15px;");
-
+    const appCanvas = document.getElementById("app");
     kaboom({
+        canvas:appCanvas,
         background: [251, 210, 149],
         width: window.innerWidth,
         height: window.innerHeight,
@@ -49,7 +50,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let inputCooldown = 0.1;
     let lastInputTime = 0;
 
-    scene("changeDeviceOri",()=>{
+    scene("changeDeviceOri", () => {
         add([
             text(`Please use a computer or tablet`, { font: "baifont" }),
             scale(0.3),
@@ -58,7 +59,7 @@ document.addEventListener("DOMContentLoaded", () => {
             color(0, 0, 0),
         ])
     })
-    
+
     scene("gameover", (score) => {
         add([
             text(`Game Over`, { font: "baifont" }),
@@ -129,15 +130,31 @@ document.addEventListener("DOMContentLoaded", () => {
         retryBtn.onClick(() => {
             go("gameplay", true);
         });
-        onUpdate(()=>{
-            if(gamepad){
-            if (gamepad.isPressed("south")) {
-            go("gameplay", true);
-            }
+        onUpdate(() => {
+            if (gamepad) {
+                if (gamepad.isPressed("south")) {
+                    go("gameplay", true);
+                }
             }
         })
     });
-
+    const touchEndActions = []
+    appCanvas.addEventListener('touchend',(e)=>{
+        [...e.changedTouches].forEach((t)=>{
+            touchEndActions.forEach((action)=>{
+                action(t.indentifier,vec2(t.clientX,t.clientY).scale(1 / appCanvas.scale))
+            })
+        })
+    })
+    function onTouchEnd(action){
+      touchEndActions.push(action)
+        return ()=>{
+            const idx = touchEndActions.findIndex(a => a === action)
+            if(idx >= 0){
+                touchEndActions.splice(idx,1)
+            }
+        }
+    }
     scene("gameplay", (isPlaying) => {
         setGravity(3000);
 
@@ -156,6 +173,7 @@ document.addEventListener("DOMContentLoaded", () => {
         let player;
         let leftButton;
         let rightButton;
+        let jumpButton;
         function addPlayer() {
             player = add([
                 sprite("capybara"),
@@ -165,32 +183,83 @@ document.addEventListener("DOMContentLoaded", () => {
                 body(),
             ]);
         }
-       addPlayer()
-        const addLeftButton = ()=>{
+        addPlayer()
+        const addLeftButton = () => {
             leftButton = add([
                 sprite("leftIcon"),
                 pos(0 + 80, height() - 120),
                 anchor("center"),
                 area(),
                 z(99),
+                opacity(0.5),
                 "leftBtn",
             ]);
-            leftButton.onClick(() => {
-            });
         }
-        const addRightButton = ()=>{
+        const addRightButton = () => {
             rightButton = add([
-                sprite("rightIcon"),
-                pos(leftButton.pos.x + 60, leftButton.pos.y),
+                sprite("leftIcon"),
+                pos(0 + 250, height() - 120),
                 anchor("center"),
                 area(),
                 z(100),
+                opacity(0.5),
                 "rightBtn",
             ]);
-            rightButton.onClick(() => {
-            });
+            rightButton.angle = -180;
         }
-        addLeftButton()
+        const addJumpButton = () => {
+            jumpButton = add([
+                sprite("actionIcon"),
+                pos(width() - 180, height() - 120),
+                anchor("center"),
+                area(),
+                z(100),
+                opacity(0.5),
+                "actionBtn",
+            ]);
+        }
+        if (WURFL.is_mobile && !gamepad) {
+            addLeftButton();
+            addRightButton();
+            addJumpButton();
+
+            onClick(pos => {
+                console.log("Mouse Click:", pos);
+                handleInput(pos);
+            });
+
+            onMouseRelease(pos => {
+                console.log("Mouse Release:", pos);
+                resetButtonOpacity(pos);
+            });
+
+            function handleInput(pos) {
+                console.log(`Mouse pos: ${pos}, Left Button pos: ${leftButton.pos}, Right Button pos: ${rightButton.pos}, Jump Button pos: ${jumpButton.pos}`);
+
+                if (leftButton.hasPoint(pos)) {
+                    console.log("Left Button Pressed");
+                    leftButton.opacity = 1;
+                } else if (rightButton.hasPoint(pos)) {
+                    console.log("Right Button Pressed");
+                    rightButton.opacity = 1;
+                } else if (jumpButton.hasPoint(pos)) {
+                    console.log("Jump Button Pressed");
+                    jump();
+                    jumpButton.opacity = 1;
+                }
+            }
+
+            function resetButtonOpacity(pos) {
+                if (leftButton.hasPoint(pos)) {
+                    leftButton.opacity = 0.5;
+                } else if (rightButton.hasPoint(pos)) {
+                    rightButton.opacity = 0.5;
+                } else if (jumpButton.hasPoint(pos)) {
+                    jumpButton.opacity = 0.5;
+                }
+            }
+        }
+
         function createFloorSegment(xPos) {
             const floor = add([
                 rect(width(), floorHeight),
@@ -481,9 +550,11 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
 
-
+        onGamepadDisconnect((gamepad2) => {
+            gamepad = null
+        })
     });
-    scene("menu",()=>{
+    scene("menu", () => {
         const capybara = add([
             sprite("CapyBaraM"),
             scale(0.8),
@@ -497,22 +568,22 @@ document.addEventListener("DOMContentLoaded", () => {
             pos(capybara.pos.x + 450, capybara.pos.y - 350),
             anchor("center"),
         ])
-        if(WURFL.is_mobile){
-        add([
-            sprite("hoppibara"),
-            pos(width() - 300,height()/2 - 200),
-            anchor("center"),
-        ])
-     }else{
+        if (WURFL.is_mobile) {
+            add([
+                sprite("hoppibara"),
+                pos(width() - 300, height() / 2 - 200),
+                anchor("center"),
+            ])
+        } else {
             add([
                 sprite("hoppibara2"),
-                pos(width() - 650,height()/2 - 330),
+                pos(width() - 650, height() / 2 - 330),
                 anchor("center"),
             ])
-     }
-        if(WURFL .is_mobile){
+        }
+        if (WURFL.is_mobile) {
             const playBtn = add([
-                rect(65,65),
+                rect(65, 65),
                 pos(width() - 300, height() / 2 + 50),
                 anchor("center"),
                 color(179, 120, 33),
@@ -528,12 +599,31 @@ document.addEventListener("DOMContentLoaded", () => {
                 z(11),
                 area(),
             ])
+            const score = localStorage.getItem("highScore")
+            add([
+                text(`High Score: ${score}`,{font:"baifont"}),
+                pos(width() - 300, height() / 2 + 250),
+                scale(1.3),
+                anchor("center"),
+                z(11),
+                area(),
+            ])
             playBtn.onClick(() => {
-                go("gameplay",false);
+                go("gameplay", false);
             })
-        }else{
+            onUpdate(() => {
+                if (gamepad) {
+                    if (gamepad.isPressed("south")) {
+                        go("gameplay", false);
+                    }
+                }
+            });
+            onGamepadDisconnect((gamepad2) => {
+                gamepad = null
+            })
+        } else {
             const playBtn = add([
-                rect(80,80),
+                rect(80, 80),
                 pos(width() - 620, height() / 2 + 50),
                 anchor("center"),
                 color(179, 120, 33),
@@ -549,14 +639,36 @@ document.addEventListener("DOMContentLoaded", () => {
                 z(11),
                 area(),
             ])
+            const score = localStorage.getItem("highScore")
+            add([
+                text(`High Score: ${score}`,{font:"baifont"}),
+                pos(width() - 620, height() / 2 + 250),
+                scale(1.3),
+                anchor("center"),
+                z(11),
+                area(),
+            ])
             playBtn.onClick(() => {
-                go("gameplay",false);
+                go("gameplay", false);
             })
+            onGamepadConnect((gamepad2) => {
+                gamepad = gamepad2
+            })
+            onGamepadDisconnect((gamepad2) => {
+                gamepad = null
+            })
+            onUpdate(() => {
+                if (gamepad) {
+                    if (gamepad.isPressed("south")) {
+                        go("gameplay", false);
+                    }
+                }
+            });
         }
     })
-    if(WURFL.is_mobile && window.innerWidth <= 550){
+    if (WURFL.is_mobile && window.innerWidth <= 550) {
         go("changeDeviceOri")
-    }else{
+    } else {
         go("menu");
     }
 });
